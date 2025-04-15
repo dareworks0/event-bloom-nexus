@@ -181,13 +181,23 @@ export async function signUp(email: string, password: string, userData: Partial<
   return data;
 }
 
-export async function signIn(email: string, password: string) {
+export async function signIn(email: string, password: string, role?: UserRole) {
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password
   });
 
   if (error) throw error;
+  
+  // If role is specified, check if it matches the user's role
+  if (role) {
+    const profile = await getProfile(data.user.id);
+    if (profile.role !== role) {
+      await signOut(); // Sign out if role doesn't match
+      throw new Error(`Invalid role. You are not registered as a ${role}.`);
+    }
+  }
+  
   return data;
 }
 

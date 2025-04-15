@@ -4,7 +4,7 @@ import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -17,10 +17,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
+import { UserRole } from "@/lib/types";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
+  role: z.enum(["attendee", "organizer"] as const),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -41,13 +43,14 @@ export function LoginForm() {
     defaultValues: {
       email: "",
       password: "",
+      role: "attendee" as UserRole,
     },
   });
 
   async function onSubmit(data: LoginFormValues) {
     setIsLoading(true);
     try {
-      await login(data.email, data.password);
+      await login(data.email, data.password, data.role);
       toast({
         title: "Login successful",
         description: "Welcome back to EventHub!",
@@ -99,6 +102,42 @@ export function LoginForm() {
                 <FormLabel>Password</FormLabel>
                 <FormControl>
                   <Input placeholder="••••••••" type="password" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="role"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Login as</FormLabel>
+                <FormControl>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Button
+                      type="button"
+                      variant={field.value === "attendee" ? "default" : "outline"}
+                      className="flex-1 h-16"
+                      onClick={() => field.onChange("attendee")}
+                    >
+                      <div className="flex flex-col items-center">
+                        <UserCircle className="h-5 w-5 mb-1" />
+                        <span>Attendee</span>
+                      </div>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={field.value === "organizer" ? "default" : "outline"}
+                      className="flex-1 h-16"
+                      onClick={() => field.onChange("organizer")}
+                    >
+                      <div className="flex flex-col items-center">
+                        <UserCircle className="h-5 w-5 mb-1" />
+                        <span>Organizer</span>
+                      </div>
+                    </Button>
+                  </div>
                 </FormControl>
                 <FormMessage />
               </FormItem>

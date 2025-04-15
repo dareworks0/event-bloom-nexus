@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<User>;
+  login: (email: string, password: string, role?: UserRole) => Promise<User>;
   register: (userData: Partial<User> & { password: string }) => Promise<User>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => Promise<User>;
@@ -50,12 +50,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  // Login function
-  const login = async (email: string, password: string): Promise<User> => {
+  // Login function - now accepts a role parameter
+  const login = async (email: string, password: string, role?: UserRole): Promise<User> => {
     setIsLoading(true);
     
     try {
-      await signIn(email, password);
+      await signIn(email, password, role);
       const user = await getCurrentUser();
       
       if (!user) {
@@ -77,9 +77,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const { password, ...userDetails } = userData;
       await signUp(userDetails.email || "", password, userDetails);
       
-      // In a real app, we'd wait for email verification
-      // For now, we'll log them in right away
-      return await login(userDetails.email || "", password);
+      // Login after registration
+      return await login(userDetails.email || "", password, userDetails.role);
     } finally {
       setIsLoading(false);
     }

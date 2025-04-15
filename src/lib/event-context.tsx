@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Event, EventCategory, EventFilter } from "./types";
 import { getEvents as fetchEvents, getEvent as fetchEvent, createEvent as createEventService, updateEvent as updateEventService, deleteEvent as deleteEventService, bookEvent as bookEventService, cancelBooking as cancelBookingService } from "./supabase-service";
