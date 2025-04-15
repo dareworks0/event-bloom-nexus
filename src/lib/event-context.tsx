@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Event, EventCategory, EventFilter } from "./types";
 import { getEvents as fetchEvents, getEvent as fetchEvent, createEvent as createEventService, updateEvent as updateEventService, deleteEvent as deleteEventService, bookEvent as bookEventService, cancelBooking as cancelBookingService } from "./supabase-service";
@@ -35,7 +34,6 @@ export const EventProvider = ({ children }: { children: ReactNode }) => {
   const [filteredEvents, setFilteredEvents] = useState<Event[]>(events);
   const [userEvents, setUserEvents] = useState<Event[]>([]);
 
-  // Load events from Supabase
   useEffect(() => {
     const loadEvents = async () => {
       try {
@@ -48,7 +46,6 @@ export const EventProvider = ({ children }: { children: ReactNode }) => {
 
     loadEvents();
 
-    // Subscribe to changes in the events table
     const eventsChannel = supabase
       .channel('events-changes')
       .on('postgres_changes', 
@@ -66,19 +63,15 @@ export const EventProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  // Update filtered events whenever events or filter changes
   useEffect(() => {
     setFilteredEvents(filterEvents(events, filter));
   }, [events, filter]);
 
-  // Update user events whenever user or events change
   useEffect(() => {
     if (user && events.length > 0) {
       if (user.role === "attendee") {
-        // For attendees, show events they're attending
         setUserEvents(events.filter(event => event.attendees.includes(user.id)));
       } else if (user.role === "organizer") {
-        // For organizers, show events they've created
         setUserEvents(events.filter(event => event.organizerId === user.id));
       }
     } else {
@@ -92,11 +85,9 @@ export const EventProvider = ({ children }: { children: ReactNode }) => {
 
   const getEventById = async (id: string): Promise<Event | undefined> => {
     try {
-      // First check if we already have the event in our state
       const cachedEvent = events.find(e => e.id === id);
       if (cachedEvent) return cachedEvent;
       
-      // If not, fetch from API
       return await fetchEvent(id);
     } catch (error) {
       console.error("Error getting event:", error);
@@ -111,7 +102,6 @@ export const EventProvider = ({ children }: { children: ReactNode }) => {
 
     const newEvent = await createEventService(eventData, user.id);
     
-    // Transform to match our Event type
     const formattedEvent: Event = {
       id: newEvent.id,
       title: newEvent.title,
@@ -133,19 +123,16 @@ export const EventProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateExistingEvent = async (id: string, eventData: Partial<Event>): Promise<Event> => {
-    // Find the event to check permissions
     const event = events.find(e => e.id === id);
     
     if (!event) {
       throw new Error("Event not found");
     }
 
-    // Check permissions
     if (!user || (user.id !== event.organizerId && user.role !== "organizer")) {
       throw new Error("You don't have permission to update this event");
     }
 
-    // Map to database field names
     const dbEventData: any = {
       ...eventData,
       image_url: eventData.imageUrl
@@ -156,9 +143,8 @@ export const EventProvider = ({ children }: { children: ReactNode }) => {
     delete dbEventData.organizerName;
     delete dbEventData.attendees;
     
-    const updatedEvent = await updateEvent(id, dbEventData);
+    const updatedEvent = await updateEventService(id, dbEventData);
     
-    // Transform to match our Event type
     const formattedEvent: Event = {
       ...event,
       ...eventData,
@@ -169,19 +155,17 @@ export const EventProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const deleteExistingEvent = async (id: string): Promise<void> => {
-    // Find the event to check permissions
     const event = events.find(e => e.id === id);
     
     if (!event) {
       throw new Error("Event not found");
     }
 
-    // Check permissions
     if (!user || (user.id !== event.organizerId && user.role !== "organizer")) {
       throw new Error("You don't have permission to delete this event");
     }
 
-    await deleteEvent(id);
+    await deleteEventService(id);
     setEvents(prev => prev.filter(e => e.id !== id));
   };
 
@@ -196,19 +180,16 @@ export const EventProvider = ({ children }: { children: ReactNode }) => {
       throw new Error("Event not found");
     }
     
-    // Check if event is full
     if (event.attendees.length >= event.capacity) {
       throw new Error("Event is at full capacity");
     }
 
-    // Check if user is already attending
     if (event.attendees.includes(user.id)) {
       throw new Error("You are already attending this event");
     }
 
     await bookEventService(eventId, user.id);
     
-    // Update our local state
     const updatedEvent = { 
       ...event, 
       attendees: [...event.attendees, user.id] 
@@ -229,14 +210,12 @@ export const EventProvider = ({ children }: { children: ReactNode }) => {
       throw new Error("Event not found");
     }
     
-    // Check if user is attending
     if (!event.attendees.includes(user.id)) {
       throw new Error("You are not attending this event");
     }
 
     await cancelBookingService(eventId, user.id);
     
-    // Update our local state
     const updatedEvent = { 
       ...event, 
       attendees: event.attendees.filter(id => id !== user.id) 
