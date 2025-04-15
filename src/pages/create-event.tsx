@@ -78,7 +78,19 @@ export default function CreateEventPage() {
     setIsSubmitting(true);
     
     try {
-      await createEvent(data);
+      const eventData = {
+        title: data.title,
+        description: data.description,
+        date: data.date,
+        time: data.time,
+        location: data.location,
+        price: data.price,
+        category: data.category,
+        imageUrl: data.imageUrl,
+        capacity: data.capacity
+      };
+      
+      await createEvent(eventData);
       
       toast({
         title: "Event created",

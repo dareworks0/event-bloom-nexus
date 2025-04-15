@@ -1,7 +1,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { Event, EventCategory, EventFilter } from "./types";
-import { getEvents, getEvent, createEvent, updateEvent, deleteEvent, bookEvent as bookEventService, cancelBooking as cancelBookingService } from "./supabase-service";
+import { getEvents as fetchEvents, getEvent as fetchEvent, createEvent as createEventService, updateEvent as updateEventService, deleteEvent as deleteEventService, bookEvent as bookEventService, cancelBooking as cancelBookingService } from "./supabase-service";
 import { filterEvents } from "./utils";
 import { useAuth } from "./auth-context";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,27 +37,27 @@ export const EventProvider = ({ children }: { children: ReactNode }) => {
 
   // Load events from Supabase
   useEffect(() => {
-    const fetchEvents = async () => {
+    const loadEvents = async () => {
       try {
-        const data = await getEvents();
+        const data = await fetchEvents();
         setEvents(data);
       } catch (error) {
         console.error("Error loading events:", error);
       }
     };
 
-    fetchEvents();
+    loadEvents();
 
     // Subscribe to changes in the events table
     const eventsChannel = supabase
       .channel('events-changes')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'events' }, 
-        fetchEvents
+        () => loadEvents()
       )
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'attendees' }, 
-        fetchEvents
+        () => loadEvents()
       )
       .subscribe();
 
@@ -92,7 +92,12 @@ export const EventProvider = ({ children }: { children: ReactNode }) => {
 
   const getEventById = async (id: string): Promise<Event | undefined> => {
     try {
-      return await getEvent(id);
+      // First check if we already have the event in our state
+      const cachedEvent = events.find(e => e.id === id);
+      if (cachedEvent) return cachedEvent;
+      
+      // If not, fetch from API
+      return await fetchEvent(id);
     } catch (error) {
       console.error("Error getting event:", error);
       return undefined;
@@ -104,7 +109,7 @@ export const EventProvider = ({ children }: { children: ReactNode }) => {
       throw new Error("Only organizers can create events");
     }
 
-    const newEvent = await createEvent(eventData, user.id);
+    const newEvent = await createEventService(eventData, user.id);
     
     // Transform to match our Event type
     const formattedEvent: Event = {

@@ -11,6 +11,7 @@ import { formatDate } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
+import { Event } from "@/lib/types";
 import { MOCK_USERS } from "@/lib/constants";
 
 export default function EventDetailPage() {
@@ -20,20 +21,52 @@ export default function EventDetailPage() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [event, setEvent] = useState<Event | null>(null);
+  const [isEventLoading, setIsEventLoading] = useState(true);
   
-  const event = getEvent(id || "");
-  
-  // This would normally fetch the event from an API
+  // Fetch event data
   useEffect(() => {
-    if (!event) {
-      toast({
-        title: "Event not found",
-        description: "The event you're looking for doesn't exist",
-        variant: "destructive",
-      });
-      navigate("/explore");
-    }
-  }, [event, navigate, toast]);
+    const fetchEvent = async () => {
+      setIsEventLoading(true);
+      if (id) {
+        try {
+          const eventData = await getEvent(id);
+          if (eventData) {
+            setEvent(eventData);
+          } else {
+            toast({
+              title: "Event not found",
+              description: "The event you're looking for doesn't exist",
+              variant: "destructive",
+            });
+            navigate("/explore");
+          }
+        } catch (error) {
+          console.error("Error fetching event:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load event details",
+            variant: "destructive",
+          });
+          navigate("/explore");
+        } finally {
+          setIsEventLoading(false);
+        }
+      }
+    };
+    
+    fetchEvent();
+  }, [id, getEvent, navigate, toast]);
+  
+  if (isEventLoading) {
+    return (
+      <Layout>
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <p>Loading event details...</p>
+        </div>
+      </Layout>
+    );
+  }
 
   if (!event) {
     return null;
@@ -234,7 +267,7 @@ export default function EventDetailPage() {
               {!user && (
                 <Button
                   className="w-full"
-                  onClick={() => navigate(`/login?redirect=/events/${event.id}`)}
+                  onClick={() => navigate(`/login?redirect=/events/${id}`)}
                 >
                   Log in to Book
                 </Button>
