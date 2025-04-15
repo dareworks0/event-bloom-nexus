@@ -1,8 +1,8 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { User, UserRole } from "./types";
-import { MOCK_USERS } from "./constants";
-import { generateId } from "./utils";
+import { signUp, signIn, signOut, getCurrentUser, updateProfile } from "./supabase-service";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AuthContextType {
   user: User | null;
@@ -19,83 +19,75 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize auth state from localStorage
+  // Initialize auth state and set up listener
   useEffect(() => {
-    const storedUser = localStorage.getItem("eventHubUser");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
-  }, []);
+    const fetchUser = async () => {
+      try {
+        const user = await getCurrentUser();
+        setUser(user);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  // Save user to localStorage whenever it changes
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem("eventHubUser", JSON.stringify(user));
-    } else {
-      localStorage.removeItem("eventHubUser");
-    }
-  }, [user]);
+    fetchUser();
+
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session) {
+          const user = await getCurrentUser();
+          setUser(user);
+        } else {
+          setUser(null);
+        }
+        setIsLoading(false);
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   // Login function
   const login = async (email: string, password: string): Promise<User> => {
     setIsLoading(true);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // For demo, check against mock users
-    const mockUser = MOCK_USERS.find(u => u.email === email);
-    
-    if (!mockUser) {
+    try {
+      await signIn(email, password);
+      const user = await getCurrentUser();
+      
+      if (!user) {
+        throw new Error("Failed to get user after login");
+      }
+      
+      setUser(user);
+      return user;
+    } finally {
       setIsLoading(false);
-      throw new Error("Invalid email or password");
     }
-    
-    setUser(mockUser);
-    setIsLoading(false);
-    return mockUser;
   };
 
   // Register function
   const register = async (userData: Partial<User> & { password: string }): Promise<User> => {
     setIsLoading(true);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Check if email already exists
-    if (MOCK_USERS.some(u => u.email === userData.email)) {
+    try {
+      const { password, ...userDetails } = userData;
+      await signUp(userDetails.email || "", password, userDetails);
+      
+      // In a real app, we'd wait for email verification
+      // For now, we'll log them in right away
+      return await login(userDetails.email || "", password);
+    } finally {
       setIsLoading(false);
-      throw new Error("Email already in use");
     }
-    
-    // Create new user
-    const newUser: User = {
-      id: generateId(),
-      name: userData.name || "",
-      email: userData.email || "",
-      role: userData.role as UserRole || "attendee",
-      profileImage: userData.profileImage,
-      gender: userData.gender,
-      city: userData.city,
-      interests: userData.interests,
-      age: userData.age,
-      budget: userData.budget,
-      verified: false, // Would be verified via email in a real app
-    };
-    
-    // Add to mock users (would store in DB in real app)
-    MOCK_USERS.push(newUser);
-    
-    setUser(newUser);
-    setIsLoading(false);
-    
-    return newUser;
   };
 
   // Logout function
-  const logout = () => {
+  const logout = async () => {
+    await signOut();
     setUser(null);
   };
 
@@ -103,26 +95,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updateUser = async (userData: Partial<User>): Promise<User> => {
     setIsLoading(true);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    if (!user) {
+    try {
+      if (!user) {
+        throw new Error("No user logged in");
+      }
+      
+      const updatedProfileData = await updateProfile(user.id, userData);
+      const updatedUser = { ...user, ...updatedProfileData };
+      setUser(updatedUser as User);
+      return updatedUser as User;
+    } finally {
       setIsLoading(false);
-      throw new Error("No user logged in");
     }
-    
-    const updatedUser = { ...user, ...userData };
-    
-    // Update in mock list
-    const index = MOCK_USERS.findIndex(u => u.id === user.id);
-    if (index >= 0) {
-      MOCK_USERS[index] = updatedUser;
-    }
-    
-    setUser(updatedUser);
-    setIsLoading(false);
-    
-    return updatedUser;
   };
 
   return (
