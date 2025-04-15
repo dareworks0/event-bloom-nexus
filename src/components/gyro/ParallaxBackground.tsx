@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { useMobile } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface ParallaxBackgroundProps {
   children: React.ReactNode;
@@ -20,7 +20,7 @@ export function ParallaxBackground({
   const [rotation, setRotation] = useState({ x: 0, y: 0 });
   const [isSupported, setIsSupported] = useState(true);
   const [mouseMoveEnabled, setMouseMoveEnabled] = useState(false);
-  const isMobile = useMobile();
+  const isMobile = useIsMobile();
 
   // Handle initial device support check
   useEffect(() => {
@@ -96,7 +96,7 @@ export function ParallaxBackground({
   const transformStyle = (isSupported || mouseMoveEnabled)
     ? { 
         transform: `perspective(1000px) rotateX(${rotation.y}deg) rotateY(${-rotation.x}deg)`,
-        transformStyle: "preserve-3d"
+        transformStyle: "preserve-3d" as "preserve-3d" // Type assertion to fix the error
       }
     : {};
 
