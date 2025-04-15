@@ -4,7 +4,7 @@ import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, UserCircle } from "lucide-react";
+import { Loader2, UserCircle, Mail, Lock, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -18,6 +18,8 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { UserRole } from "@/lib/types";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ParallaxBackground } from "@/components/gyro/ParallaxBackground";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -33,6 +35,7 @@ export function LoginForm() {
   const navigate = useNavigate();
   const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Get the redirect URL from query params or default to dashboard
   const searchParams = new URLSearchParams(location.search);
@@ -49,6 +52,8 @@ export function LoginForm() {
 
   async function onSubmit(data: LoginFormValues) {
     setIsLoading(true);
+    setAuthError(null);
+    
     try {
       await login(data.email, data.password, data.role);
       toast({
@@ -57,24 +62,38 @@ export function LoginForm() {
       });
       navigate(redirectTo);
     } catch (error) {
-      toast({
-        title: "Login failed",
-        description: (error as Error).message || "Invalid email or password",
-        variant: "destructive",
-      });
+      const errorMessage = (error as Error).message;
+      
+      if (errorMessage.includes("Invalid role")) {
+        setAuthError("You are not registered with this role. Please try again with a different role.");
+      } else if (errorMessage.includes("Invalid login credentials")) {
+        setAuthError("Invalid email or password. Please check your credentials and try again.");
+      } else if (errorMessage.includes("Email not confirmed")) {
+        setAuthError("Please confirm your email before logging in.");
+      } else {
+        setAuthError(errorMessage || "An unexpected error occurred during login.");
+      }
     } finally {
       setIsLoading(false);
     }
   }
 
   return (
-    <div className="mx-auto w-full max-w-md space-y-6">
+    <ParallaxBackground className="mx-auto w-full max-w-md space-y-6 bg-white dark:bg-gray-900 p-8 rounded-xl shadow-lg animate-entrance">
       <div className="space-y-2 text-center">
         <h1 className="text-3xl font-bold">Welcome back</h1>
         <p className="text-gray-500">
           Enter your credentials to access your account
         </p>
       </div>
+      
+      {authError && (
+        <Alert variant="destructive" className="animate-fade-in">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{authError}</AlertDescription>
+        </Alert>
+      )}
+      
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <FormField
@@ -82,11 +101,14 @@ export function LoginForm() {
             name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email</FormLabel>
+                <FormLabel className="flex items-center gap-2">
+                  <Mail className="h-4 w-4" /> Email
+                </FormLabel>
                 <FormControl>
                   <Input
                     placeholder="your.email@example.com"
                     type="email"
+                    className="transition-all duration-200 focus:ring-2 focus:ring-primary"
                     {...field}
                   />
                 </FormControl>
@@ -94,19 +116,28 @@ export function LoginForm() {
               </FormItem>
             )}
           />
+          
           <FormField
             control={form.control}
             name="password"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Password</FormLabel>
+                <FormLabel className="flex items-center gap-2">
+                  <Lock className="h-4 w-4" /> Password
+                </FormLabel>
                 <FormControl>
-                  <Input placeholder="••••••••" type="password" {...field} />
+                  <Input 
+                    placeholder="••••••••" 
+                    type="password" 
+                    className="transition-all duration-200 focus:ring-2 focus:ring-primary"
+                    {...field} 
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
+          
           <FormField
             control={form.control}
             name="role"
@@ -118,8 +149,11 @@ export function LoginForm() {
                     <Button
                       type="button"
                       variant={field.value === "attendee" ? "default" : "outline"}
-                      className="flex-1 h-16"
-                      onClick={() => field.onChange("attendee")}
+                      className="flex-1 h-16 hover-scale transition-all"
+                      onClick={() => {
+                        field.onChange("attendee");
+                        setAuthError(null);
+                      }}
                     >
                       <div className="flex flex-col items-center">
                         <UserCircle className="h-5 w-5 mb-1" />
@@ -129,8 +163,11 @@ export function LoginForm() {
                     <Button
                       type="button"
                       variant={field.value === "organizer" ? "default" : "outline"}
-                      className="flex-1 h-16"
-                      onClick={() => field.onChange("organizer")}
+                      className="flex-1 h-16 hover-scale transition-all"
+                      onClick={() => {
+                        field.onChange("organizer");
+                        setAuthError(null);
+                      }}
                     >
                       <div className="flex flex-col items-center">
                         <UserCircle className="h-5 w-5 mb-1" />
@@ -143,7 +180,8 @@ export function LoginForm() {
               </FormItem>
             )}
           />
-          <Button type="submit" className="w-full" disabled={isLoading}>
+          
+          <Button type="submit" className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 transition-opacity" disabled={isLoading}>
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Please wait
@@ -154,6 +192,7 @@ export function LoginForm() {
           </Button>
         </form>
       </Form>
+      
       <div className="text-center text-sm">
         <p className="text-gray-500">
           Don't have an account?{" "}
@@ -162,6 +201,6 @@ export function LoginForm() {
           </Link>
         </p>
       </div>
-    </div>
+    </ParallaxBackground>
   );
 }
